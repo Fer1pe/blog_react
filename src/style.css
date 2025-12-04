@@ -1,0 +1,34 @@
+/* style.css */
+/* Cores Pastel */
+.bg-pastel-nav {
+    background-color: rgba(204, 202, 212, 0.7);
+}
+
+.bg-pastel-footer {
+    background-color: rgba(204, 202, 212, 0.7);
+}
+
+/* Botão de logout flutuante (canto inferior direito) */
+.btn-logout {
+    position: fixed;
+    font-size: 15px;
+    font-weight: bold;
+    font-family: sans-serif;
+    color: #fff;
+    background-color: #be4c4c;
+    bottom: 4%;
+    right: 4%;
+    height: 60px;
+    width: 60px;
+    border-radius: 50%;
+    border: none;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+}
+
+.btn-logout:hover {
+    background-color: #ff0000;
+    color: #fff;
+    transform: scale(1.05);
+}
