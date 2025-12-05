@@ -1,127 +1,113 @@
-//src/pages/ArticlePage/index.js
+// src/pages/ArticlePage/index.js
 
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+// Importa Link para permitir a navegação para a página individual do artigo
+import { Link } from "react-router-dom"; 
 import { db } from "../../FirebaseConn";
-import { collection, query, where, getDocs } from "firebase/firestore";
+// Importa orderBy para ordenar os resultados por data
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore"; 
 
 import Header from "../../Components/Header";
 import Footer from "../../Components/Footer";
+import Spinner from "../../Components/Spinner";
 
 export default function ArticlePage() {
-    // Pega o parâmetro 'slug' da URL (ex: /artigo/meu-primeiro-artigo)
-    const { slug } = useParams(); 
-    
-    const [article, setArticle] = useState(null);
+    // Agora armazena a lista de artigos (em plural)
+    const [articles, setArticles] = useState([]); 
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (slug) {
-            loadArticleBySlug(slug);
-        }
-    }, [slug]);
-
-    /**
-     * @description Busca o artigo no Firestore usando o slug (e verifica se está publicado).
-     * @param {string} articleSlug O slug do artigo na URL.
-     */
-    async function loadArticleBySlug(articleSlug) {
-        setLoading(true);
-        setArticle(null); // Limpa o artigo anterior
-
-        try {
-            const articlesRef = collection(db, 'articles');
-            // Busca pelo slug e garante que o artigo está publicado
-            const q = query(
-                articlesRef, 
-                where("slug", "==", articleSlug),
-                where("isPublished", "==", true)
-            );
-            
-            const snapshot = await getDocs(q);
-
-            if (snapshot.empty) {
-                // Artigo não encontrado ou não publicado
-                console.log(`Artigo com slug "${articleSlug}" não encontrado ou não publicado.`);
-                setArticle(null); 
-            } else {
-                // Artigo encontrado!
-                const doc = snapshot.docs[0];
-                setArticle({
-                    id: doc.id,
-                    ...doc.data(),
-                    createdAt: doc.data().createdAt?.toDate() || new Date(),
-                });
-            }
-
-        } catch (error) {
-            console.error("Erro ao carregar artigo:", error);
-            setArticle(null); 
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    // Função auxiliar para formatar a data
     const formatDate = (date) => {
         if (date instanceof Date && !isNaN(date)) {
-            return date.toLocaleDateString('pt-BR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            return date.toLocaleDateString("pt-BR");
         }
-        return 'Data indisponível';
+        return "Data indisponível";
     };
 
-    // Renderização do componente
+    useEffect(() => {
+        async function loadArticles() {
+            setLoading(true);
+
+            try {
+                const articlesRef = collection(db, "articles");
+
+                // Busca *todos* os artigos publicados, ordenados pela data de criação
+                const q = query(
+                    articlesRef,
+                    where("isPublished", "==", true), // Filtra apenas artigos marcados como "Publicado"
+                    orderBy("createdAt", "desc") // Ordena do mais recente para o mais antigo
+                );
+                const querySnapshot = await getDocs(q);
+
+                const articlesList = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    // Converte Timestamp do Firestore para o objeto Date
+                    createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date(),
+                }));
+
+                setArticles(articlesList);
+                
+            } catch (error) {
+                console.error("Erro ao buscar artigos:", error);
+                setArticles([]);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        loadArticles();
+    }, []);
+
     return (
         <div>
-            <Header title="CMS Blog" />
+            <Header />
+
             <div className="container mt-5 pt-5 mb-5">
                 <div className="row">
                     <div className="col-12 col-md-10 mx-auto">
+                        
+                        <h1 className="text-center text-primary fw-bold mb-5">Todos os Artigos Publicados</h1>
 
+                        {/* Spinner de Carregamento */}
                         {loading && (
-                            <div className="text-center mt-5">
-                                <div className="spinner-border text-primary" role="status">
-                                    <span className="visually-hidden">Carregando artigo...</span>
-                                </div>
+                            <Spinner message="Carregando lista de artigos..." colorClass="text-info" />
+                        )}
+
+                        {/* Lista de Artigos Encontrados */}
+                        {!loading && articles.length > 0 && (
+                            <div className="list-group">
+                                {articles.map(article => (
+                                    // Cada artigo é um link para sua página individual
+                                    <Link 
+                                        to={`/artigo/${article.slug}`} 
+                                        key={article.id} 
+                                        className="list-group-item list-group-item-action flex-column align-items-start mb-3 p-4 shadow-sm rounded-lg border-0"
+                                    >
+                                        <div className="d-flex w-100 justify-content-between">
+                                            <h5 className="mb-1 fw-bold text-dark">{article.title}</h5>
+                                            <small className="text-muted">{formatDate(article.createdAt)}</small>
+                                        </div>
+                                        <p className="mb-1 text-secondary">
+                                            {/* Exibe um pequeno snippet do conteúdo, removendo tags HTML */}
+                                            {article.content.replace(/<[^>]*>/g, '').substring(0, 150)}...
+                                        </p>
+                                        <small className="text-primary fw-bold">Leia mais &rarr;</small>
+                                    </Link>
+                                ))}
                             </div>
                         )}
 
-                        {!loading && article ? (
-                            // CONTEÚDO DO ARTIGO
-                            <article className="mt-5 p-4 bg-white shadow-sm rounded">
-                                <h1 className="display-4 mb-4 text-center">{article.title}</h1>
-                                <p className="lead text-muted text-center border-bottom pb-3">
-                                    Por **{article.authorEmail}** em {formatDate(article.createdAt)}
-                                </p>
-                                
-                                {/* IMPORTANTE: 
-                                    Renderiza o HTML gerado pelo RichTextEditor. 
-                                    Isto é NECESSÁRIO para exibir negrito, listas, etc., 
-                                    mas só deve ser usado com conteúdo confiável.
-                                */}
-                                <div 
-                                    className="article-content mt-5"
-                                    dangerouslySetInnerHTML={{ __html: article.content }} 
-                                />
-                            </article>
-                        ) : (
-                            // MENSAGEM DE ERRO (404)
-                            !loading && (
-                                <div className="text-center mt-5 p-5 bg-light rounded shadow-sm">
-                                    <h2 className="text-danger">Erro 404: Artigo Não Encontrado</h2>
-                                    <p className="lead mt-3">
-                                        O artigo que você está procurando não existe ou ainda não foi publicado.
-                                    </p>
-                                </div>
-                            )
+                        {/* Mensagem de Lista Vazia */}
+                        {!loading && articles.length === 0 && (
+                            <div className="text-center mt-5 p-5 bg-light rounded shadow-sm">
+                                <h2 className="text-secondary">Nenhum Artigo Publicado</h2>
+                                <p className="lead mt-3 text-muted">Ainda não há conteúdo disponível no blog.</p>
+                            </div>
                         )}
                     </div>
                 </div>
             </div>
+
             <Footer />
         </div>
     );

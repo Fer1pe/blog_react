@@ -1,11 +1,16 @@
-/* style.css */
-/* Cores Pastel */
+/* src/style.css */
+
+/* Cores Empresariais */
 .bg-pastel-nav {
-    background-color: rgba(204, 202, 212, 0.7);
+    /* Novo: Azul Marinho para Header (Cor principal) */
+    background-color: #003366; 
 }
 
 .bg-pastel-footer {
-    background-color: rgba(204, 202, 212, 0.7);
+    /* Novo: Cinza Claro (Cor secundária) */
+    background-color: #f8f9fa;
+    /* Adiciona borda superior para separação visual */
+    border-top: 1px solid #e9ecef; 
 }
 
 /* Botão de logout flutuante (canto inferior direito) */
@@ -14,8 +19,10 @@
     font-size: 15px;
     font-weight: bold;
     font-family: sans-serif;
+    /* Cor do texto: Branco */
     color: #fff;
-    background-color: #be4c4c;
+    /* Novo: Vermelho de alerta (Mais sóbrio que o anterior) */
+    background-color: #dc3545; 
     bottom: 4%;
     right: 4%;
     height: 60px;
@@ -28,7 +35,25 @@
 }
 
 .btn-logout:hover {
-    background-color: #ff0000;
+    /* Novo: Vermelho mais escuro no hover */
+    background-color: #c82333; 
     color: #fff;
     transform: scale(1.05);
+}
+
+.footer-small {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    min-height: 35px; /* menor que a navbar padrão */
+}
+
+.footer-small .navbar-brand {
+    font-size: 0.75rem; /* menor que "small" */
+    padding: 0;
+    margin: 0;
+}
+.footer-small .nav-link {
+    font-size: 0.75rem; /* menor que "small" */
+    padding: 0 5px;
+    margin: 0;
 }

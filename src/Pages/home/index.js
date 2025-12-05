@@ -4,137 +4,132 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { auth, db } from "../../FirebaseConn";
 import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
-
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import Header from "../../Components/Header";
 import Footer from "../../Components/Footer";
 import ArticleCard from "../../Components/ArticleCard"; 
+import Spinner from "../../Components/Spinner"; // <<< IMPORTADO
 
 export default function Home() {
+    const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    // isLoggedIn monitora se o usuário está autenticado. 
-    // Se estiver, mostra o blog; se não, mostra o login de autor.
-    const [isLoggedIn, setIsLoggedIn] = useState(false); 
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [articles, setArticles] = useState([]);
-    const [loginError, setLoginError] = useState(''); // Estado para exibir erros de login ao usuário
-    const [loadingArticles, setLoadingArticles] = useState(true); // Estado de loading para a lista de artigos
-    const [loadingLogin, setLoadingLogin] = useState(false); // Estado de loading para o botão de login
+    const [loadingArticles, setLoadingArticles] = useState(true);
+    const [loadingLogin, setLoadingLogin] = useState(false);
+    const [loginError, setLoginError] = useState('');
 
-    const navigate = useNavigate();
 
-    // 1. Monitora o estado da autenticação (chamado uma vez na montagem)
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // Usuário logado: exibe o blog principal
-                setIsLoggedIn(true);
-                loadArticles();
-            } else {
-                // Usuário deslogado: exibe o formulário de login do autor
-                setIsLoggedIn(false);
-                setArticles([]); 
-                setLoadingArticles(false); // Garante que o estado de loading é removido
-            }
-        });
-        // Cleanup function para parar de monitorar quando o componente for desmontado
-        return () => unsubscribe();
-    }, []);
+    // 1. Função de Login
+    async function handleLogin(e) {
+        e.preventDefault();
+        setLoadingLogin(true);
+        setLoginError('');
 
-    // 2. Carrega artigos publicados do Firestore
-    async function loadArticles() {
-        setLoadingArticles(true);
-        const articlesRef = collection(db, 'articles');
-        
-        // Consulta: apenas artigos publicados, ordenados por data de criação decrescente, limitando a 20.
-        // ATENÇÃO: Essa consulta requer um índice composto no Firestore para os campos (isPublished, createdAt).
-        const q = query(articlesRef, where("isPublished", "==", true), orderBy("createdAt", "desc"), limit(20));
+        if (email === '' || password === '') {
+            setLoginError('Preencha e-mail e senha.');
+            setLoadingLogin(false);
+            return;
+        }
 
         try {
+            await signInWithEmailAndPassword(auth, email, password);
+            // Redireciona para admin após o login (o onAuthStateChanged fará a transição)
+            navigate('/admin', { replace: true });
+        } catch (error) {
+            console.error("Erro no login:", error);
+            if (error.code === 'auth/invalid-credential') {
+                 setLoginError('Credenciais inválidas. Verifique seu e-mail e senha.');
+            } else if (error.code === 'auth/user-not-found') {
+                setLoginError('Usuário não encontrado.');
+            } else {
+                 setLoginError('Erro ao fazer login. Tente novamente.');
+            }
+        } finally {
+            setLoadingLogin(false);
+        }
+    }
+
+
+    // 2. Função para carregar artigos publicados
+    async function loadArticles() {
+        setLoadingArticles(true);
+        try {
+            const articlesRef = collection(db, "articles");
+            // Busca apenas artigos que estão publicados, ordenados por data
+            const q = query(articlesRef, where("isPublished", "==", true), orderBy("createdAt", "desc"));
             const querySnapshot = await getDocs(q);
-            const loadedArticles = [];
-            querySnapshot.forEach((doc) => {
+
+            const articlesList = querySnapshot.docs.map(doc => {
                 const data = doc.data();
-                loadedArticles.push({
+                // Converte o timestamp para objeto Date para exibição
+                if (data.createdAt && data.createdAt.toDate) {
+                    data.createdAt = data.createdAt.toDate();
+                }
+                return {
                     id: doc.id,
                     ...data,
-                    // Converte o Timestamp do Firestore para objeto Date do JavaScript
-                    createdAt: data.createdAt?.toDate() || new Date(), 
-                });
+                };
             });
-            setArticles(loadedArticles);
+            setArticles(articlesList);
+
         } catch (error) {
-            console.error("Erro ao carregar artigos. Verifique a conexão com o Firebase ou se o índice composto foi criado:", error);
-            // Poderia adicionar setArticleError aqui se quisesse mostrar uma mensagem na tela principal do blog.
+            console.error("Erro ao carregar artigos:", error);
+            setArticles([]);
         } finally {
             setLoadingArticles(false);
         }
     }
 
-    // 3. Lógica de Login para Autores
-    async function handleLogin(e) {
-        e.preventDefault();
-        setLoginError(''); // Limpa erros anteriores
+    // 3. Efeito para carregar artigos na montagem e verificar autenticação
+    useEffect(() => {
+        loadArticles();
 
-        if (!email || !password) {
-            setLoginError('Preencha e-mail e senha para login.');
-            return;
-        }
-
-        setLoadingLogin(true);
-
-        try {
-            await signInWithEmailAndPassword(auth, email, password);
-            // O onAuthStateChanged será ativado, atualizando isLoggedIn.
-            // Redireciona para o painel de administração (após o login bem-sucedido)
-            navigate('/admin', { replace: true });
-        } catch (error) {
-            console.error("Erro ao fazer login (objeto completo):", error);
-            
-            let message = "Erro ao fazer login. Tente novamente.";
-            if (error.code === 'auth/invalid-credential') {
-                message = "Credenciais inválidas. Verifique seu e-mail e senha.";
-            } else if (error.code === 'auth/user-disabled') {
-                message = "Esta conta de usuário foi desativada.";
+        // Listener de autenticação para verificar se o usuário está logado
+        const unsub = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Usuário logado - mostra a Home como Blog Principal
+                setIsLoggedIn(true);
             } else {
-                message = `Erro: ${error.message}`;
+                // Usuário deslogado - mostra a Home como Tela de Login
+                setIsLoggedIn(false);
             }
-            
-            setLoginError(message);
-        } finally {
-            setLoadingLogin(false);
+        });
+
+        // Cleanup
+        return () => {
+            unsub();
         }
-    }
+    }, []);
 
     // 4. Renderização
     if (isLoggedIn) {
         // --- VISÃO DO BLOG PRINCIPAL (Usuário Logado) ---
         return (
             <div>
-                <Header title="Blog Principal" />
+                <Header /> 
                 {/* Espaço para o fixed Header */}
                 <span className="mt-5">&nbsp;</span> 
                 <div className="container mt-5 pt-3 mb-5">
-                    <h1 className="text-center">Blog Principal</h1>
+                    <h1 className="text-center text-primary fw-bold">Blog Principal</h1>
                     <p className="text-center mb-4">
-                        <Link to="/admin" className="btn btn-warning btn-sm shadow-sm">
+                        {/* Botão de Admin alterado para info (azul claro) */}
+                        <Link to="/admin" className="btn btn-info btn-sm shadow-sm">
                             Ir para o Painel de Administração
                         </Link>
                     </p>
+                  
                     <hr className="mb-5"/>
                     
-                    {/* Indicador de Carregamento de Artigos */}
+                    {/* Indicador de Carregamento de Artigos - USANDO O COMPONENTE SPINNER */}
                     {loadingArticles && (
-                        <div className="text-center mt-5">
-                             <div className="spinner-border text-primary" role="status">
-                                 <span className="visually-hidden">Carregando artigos...</span>
-                             </div>
-                             <p className="text-muted mt-2">Carregando artigos...</p>
-                        </div>
+                        <Spinner message="Carregando artigos..." colorClass="text-primary" />
                     )}
 
                     {/* Lista de Artigos */}
-                    {!loadingArticles && articles.length === 0 ? (
+                    {!loadingArticles && articles.length === 0 ?
+                    (
                         <p className="text-center mt-5">Nenhum artigo publicado ainda.</p>
                     ) : (
                         <div className="row">
@@ -145,6 +140,7 @@ export default function Home() {
                             ))}
                         </div>
                     )}
+              
                 </div>
                 <Footer />
             </div>
@@ -154,7 +150,7 @@ export default function Home() {
     // --- VISÃO DA ÁREA DE LOGIN (Usuário Deslogado) ---
     return (
         <div>
-            <Header title="Área do Autor" />
+            <Header /> 
             {/* Espaço para o fixed Header */}
             <span className="mt-5">&nbsp;</span> 
             
@@ -163,6 +159,7 @@ export default function Home() {
                     {/* Centraliza o card de login em diferentes tamanhos de tela */}
                     <div className="col-12 col-md-8 col-lg-6 mx-auto"> 
                         <div className="card shadow-lg p-4 mt-5 border-0 rounded-4">
+                            {/* Título ajustado para text-primary (azul marinho) e negrito */}
                             <h4 className="card-title text-center text-primary fw-bold">Login do Autor</h4>
                             <p className="card-subtitle mb-4 text-muted text-center">Entre para gerenciar seus artigos</p>
 
@@ -201,13 +198,14 @@ export default function Home() {
                                     </div>
                                 )}
 
-                                {/* Botão de Login com Loading State */}
+                                {/* Botão de Login com Loading State (Mantido inline) */}
                                 <button
-                                    className="btn btn-success w-100 fw-bold shadow-sm"
+                                    className="btn btn-primary w-100 fw-bold shadow-sm" 
                                     type="submit"
                                     disabled={loadingLogin}
                                 >
-                                    {loadingLogin ? (
+                                    {loadingLogin ?
+                                    (
                                         <>
                                             <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                             {' Entrando...'}
@@ -216,17 +214,17 @@ export default function Home() {
                                 </button>
                             </form>
                         </div>
-                        
+     
                         {/* Link de Cadastro */}
                         <div className="text-center mt-3">
-                            <Link to="/register" className="text-decoration-none text-primary">
-                                Não tem conta? Crie uma aqui
+                            <Link to="/register" className="text-decoration-none text-info"> 
+                                Não tem conta? **Crie uma aqui**
                             </Link>
                         </div>
 
                     </div>
                 </div>
-            </div>
+           </div>
 
             <Footer />
         </div>

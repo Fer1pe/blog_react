@@ -2,80 +2,66 @@
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { auth } from "../../FirebaseConn"; // Importa a instância do Auth
+import { auth } from "../../FirebaseConn";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import Header from "../Header"; // Assumindo que Header está em ../Header/index.js
-import Footer from "../Footer"; // Assumindo que Footer está em ../Footer/index.js
+import Header from "../Header";
+import Footer from "../Footer";
 
 export default function Register() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
 
-    /**
-     * @description Lida com o processo de cadastro de um novo usuário via Firebase Authentication.
-     * @param {Event} e Evento de submissão do formulário.
-     */
-    async function handleRegister(e) {
+    async function handleRegister(e) { 
         e.preventDefault();
 
-        if (!email || !password) {
-            alert('Preencha todos os campos.');
-            return;
-        }
-
-        if (password.length < 6) {
-            alert('A senha deve ter pelo menos 6 caracteres.');
+        if (email === '' || password === '') {
+            alert('Preencha todos os campos!');
             return;
         }
 
         try {
-            // Cria o usuário no Firebase Auth
             await createUserWithEmailAndPassword(auth, email, password);
-            
-            // Redireciona para o painel de administração
-            navigate('/admin', { replace: true });
-            
+            alert('Cadastro realizado com sucesso! Faça login.');
+            navigate('/', { replace: true });
         } catch (error) {
-            // Loga o erro completo e exibe uma mensagem amigável para o usuário
-            console.error("Erro ao registrar (objeto completo):", error);
-            
-            let errorMessage = "Erro ao criar usuário. Tente novamente.";
-
-            if (error.code === 'auth/email-already-in-use') {
-                errorMessage = "Este e-mail já está em uso. Tente fazer login.";
-            } else if (error.code === 'auth/invalid-email') {
-                errorMessage = "O formato do e-mail é inválido.";
+            console.error("Erro ao cadastrar:", error);
+            if (error.code === 'auth/weak-password') {
+                alert('Senha muito fraca, utilize 6 ou mais caracteres.');
+            } else if (error.code === 'auth/email-already-in-use') {
+                alert('Este e-mail já está em uso.');
+            } else {
+                alert('Erro ao cadastrar. Tente novamente.');
             }
-            
-            alert(errorMessage);
         }
     }
 
     return (
         <div>
-            {/* O Header do CMS */}
-            <Header title="Cadastro de Autor" />
+            <Header /> 
 
             <div className="mt-5 pt-5">
                 <div className="container">
-                    <div className="row mt-5">
+                   
+                   <div className="row mt-5">
                         <div className="col-12 col-md-4 mx-auto">
                             
-                            <h4 className="text-center">Cadastre-se</h4>
-                            <p className="text-center">Crie sua conta de autor para começar a publicar.</p>
+                            {/* Título ajustado para "Autor" */}
+                            <h4 className="text-center text-primary fw-bold">Cadastro de Autor</h4>
+                            <p className="text-center text-muted">Crie sua conta para publicar artigos.</p>
 
-                            <form className="form-control mb-5 p-4 shadow-sm" onSubmit={handleRegister}>
-                                <label className="mb-1">Seu e-mail:</label>
+                            {/* Classe de formulário ajustada para remover o fundo cinza, usando apenas o card/sombra */}
+                            <form className="mb-5 p-4 shadow-sm border rounded-3" onSubmit={handleRegister}>
+                                <label className="mb-1 fw-semibold">Seu e-mail:</label>
                                 <input
                                     className="form-control mb-3"
                                     type="email"
-                                    placeholder="teste@email.com"
+                                    placeholder="teste@empresa.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
 
-                                <label className="mb-1">Sua senha (mín. 6 caracteres):</label>
+                                <label className="mb-1 fw-semibold">Sua senha (mín. 6 caracteres):</label>
                                 <input
                                     className="form-control mb-3"
                                     autoComplete="off"
@@ -86,7 +72,8 @@ export default function Register() {
                                 />
 
                                 <button
-                                    className="btn btn-primary w-100 mb-3"
+                                    // btn-primary (azul marinho/padrão) é o ideal para o contexto empresarial
+                                    className="btn btn-primary w-100 mb-3 fw-bold" 
                                     type="submit"
                                 >
                                     Cadastrar
@@ -94,15 +81,17 @@ export default function Register() {
                             </form>
                             
                             <p className="text-center">
-                                <Link to="/">Já possui uma conta? Faça login</Link>
+                                <Link to="/" className="text-decoration-none text-secondary">
+                                    Já possui uma conta? **Faça login**
+                                </Link>
                             </p>
 
                         </div>
                     </div>
                 </div>
-            </div>
+           
+           </div>
             
-            {/* O Footer do CMS */}
             <Footer />
         </div>
     );
